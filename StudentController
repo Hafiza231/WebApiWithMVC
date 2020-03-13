@@ -1,0 +1,187 @@
+using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Web.Http;
+using System.Web.Http.Cors;
+using WepApiCrudWith_MVC.Models;
+
+namespace WepApiCrudWith_MVC.Controllers
+{
+    [EnableCors(origins: "*", headers: "*", methods: "*")]
+    public class StudentController : ApiController
+    {
+        public readonly Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        public StudentController()
+        {
+        }
+        public IHttpActionResult GetAllStudents()
+        {
+            IList<student> list = null;
+            using (var context = new StudentsEntities())
+            {
+                list = context.students.ToList();
+            }
+
+            if (list.Count == 0)
+            {
+                throw new HttpResponseException(HttpStatusCode.NotFound);
+            }
+            return Ok(list);
+            
+        }
+        public IHttpActionResult GetStudentsById(int id)
+        {
+            student s = null;
+            using (var context = new StudentsEntities())
+            {
+                s = context.students.Where(x => x.Id == id).FirstOrDefault();
+                  
+            }
+
+            if (s == null)
+            {
+                var response = new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(string.Format("No Employee found with ID = {0}",id)),  
+                    ReasonPhrase = "Employee Not Found"
+                };
+
+                throw new HttpResponseException(response);
+            }
+            return Ok(s);
+        }
+
+        //http://localhost:50875/api/Student/GetAllStudentsByname?name=hafiza
+        public IHttpActionResult GetAllStudentsByname(string name)
+        {
+            IList<student> students = null;
+            using (var context = new StudentsEntities())
+            {
+                students = context.students.Where(x => x.studentname.ToLower() == name.ToLower()).ToList();
+
+            }
+
+            if (students == null)
+            {
+                return NotFound();
+            }
+            return Ok(students);
+        }
+        [HttpPost]
+        public IHttpActionResult PostNewStudent(student s)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Invalid data.");
+
+            using (var ctx = new StudentsEntities())
+            {
+                ctx.students.Add(new student()
+                {
+                    Id = s.Id,
+                    studentname = s.studentname,
+                   email=s.email,
+                   password=s.password
+                });
+
+                ctx.SaveChanges();
+            }
+
+            return Ok();
+        }
+        [HttpPost]
+        public IHttpActionResult PutStudents(student s)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest("Not a valid model");
+
+            using (var ctx = new StudentsEntities())
+            {
+                var existingStudent = ctx.students.Where(x => x.Id == s.Id).FirstOrDefault<student>();
+
+                if (existingStudent != null)
+                {
+                    existingStudent.studentname = s.studentname;
+                    existingStudent.email = s.email;
+                    existingStudent.password = s.password;
+
+                    ctx.SaveChanges();
+                }
+                else
+                {
+                    return NotFound();
+                }
+            }
+
+            return Ok();
+        }
+        [HttpPost]
+        public IHttpActionResult Delete(int id)
+        {
+            if (id <= 0)
+                return BadRequest("Not a valid student id");
+
+            using (var ctx = new StudentsEntities())
+            {
+                var student = ctx.students
+                    .Where(s => s.Id == id)
+                    .FirstOrDefault();
+
+                ctx.Entry(student).State = System.Data.Entity.EntityState.Deleted;
+                ctx.SaveChanges();
+            }
+
+            return Ok();
+        }
+    }
+}
+
+
+//Consume Api Using ajax 
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <!-- <script src="jquery-1.7.1.js" type="text/javascript"></script> -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <!-- <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script> -->
+</head>
+
+<body>
+    <div id="info">
+
+    </div>
+    <!-- <form id="form1">  
+        Name :- <input type="text" name="name" id="name" />  
+        Surname:- <input type="text" name="surname" id="surname" />  
+        <input type="button" id="Save" value="Save Data" />  
+    </form>   -->
+</body>
+<script>
+    $(document).ready(function() {
+
+        $.ajax({
+            url: 'http://localhost:50875/api/Student/GetAllStudents',
+            type: 'get',
+            dataType: 'json',
+            success: function(data) {
+                console.log(data);
+                for (let i = 0; i < data.length; i++) {
+                    $('#info').append('<h4>' + data[i].Id + '</h4>');
+                    $('#info').append('<h4>' + data[i].studentname + '</h4>');
+                    $('#info').append('<h4>' + data[i].email + '</h4>');
+
+                }
+            },
+            error: function(xhr, textStatus, errorThrown) {
+                console.log('Error in Operation');
+            }
+
+        });
+    });
+</script>
+
+</html>
